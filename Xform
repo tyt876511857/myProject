@@ -1,0 +1,331 @@
+/**
+ tyt 2017-02-10
+ form helper，with validate msg  and default hit
+ useage as folows:
+ <form id="createform"  method="post">
+		网校名称：<input type="text" id="crname" name="crname" x_hit="请输入网校" x_func="check_crname" maxlength=16 value="我的网校"><br />
+		网校域名：<input type="text" id="domain" name="domain" x_hit="xxx" x_func="check_domain" value="hhhhh"></span><br />
+		教师姓名：<input type="text" id="realname" name="realname" x_hit="请输入真实姓名" x_func="check_realname" value="H老师"></span><br />
+		手机号码：<input type="text" id="mobile" maxlength=11 name="mobile" x_hit="请输入手机号" x_func="check_mobile" value="15651773160"><br />
+		登录密码：<input type="password" id="password" maxlength=16 name="password" x_hit="请输入密码" x_func="check_password" value="123456"><br />
+		短信校验码：<input type="text" id="smscode" name="smscode"><input type="button" onclick="getcode();" value="获取短信验证码" id="sendmsg" /><span id="smscode_msg"></span><br />
+		<a id="docreate" href="javascript:void(0);" onclick="docreate()">创建网校</a>
+	</form>
+ var _xform = new xForm({domid:'createform'});
+ check if this form is ok： var res = xform.check();
+ */
+
+var xForm = xForm || (function(){
+	function xForm(param){
+		this.domid = param.domid;
+		this.errorcss = param.errorcss || "cuotic";
+		this.okcss = param.okcss || "zhengtic";
+		this.hitcss = param.hitcss || "hit";
+		this.focuscallback = param.focuscallback || function(){};
+		this.blurcallback = param.blurcallback || function(){};
+		//this.hitcss = param.hitcss || "hit";
+		this.ifdocall = true;
+		this.showokmsg = (typeof param.showokmsg == "undefined")?false:param.showokmsg;
+		this.init();
+	}
+	//xForm init method
+	xForm.prototype.init = function(){
+		var me = this;
+		$.each($("#"+me.domid+" :input"),function(i,inputobj){
+			var funcname = $(inputobj).attr('x_func');
+			var name = $(this).attr("name");
+			var x_hit = $(this).attr('x_hit');
+			var id = $(this).attr("id");
+			var ispassword = $(this).attr('type') == "password";
+			var clone_id = id+'_clone';
+			if(ispassword && ($("#"+clone_id).length == 0) ){
+				console.log($(this))
+				//修正password开始
+				var clone_input = $(document.createElement('input'));
+				var attr = {
+					name:$(this).attr('name')+'_clone',
+					id:id+'_clone',
+					type:'text',
+					style:$(this).attr('style'),
+					value:$(this).val(),
+					'class':$(this).attr('class')
+				};
+				clone_input.attr(attr);
+				$(this).after($(clone_input));
+				//修正password结束
+				$(this).after(clone_input);
+				// $(this).after($(this).clone().attr({type:'text',id:id+"_clone",name:name+"_clone"}));
+				$("#"+id+"_clone").removeClass(me.hitcss).addClass(me.hitcss);
+				$("#"+id+"_clone").val(x_hit);
+				if($(this).val() == ""){
+					$(this).hide();
+					$("#"+id+"_clone").show();
+				}else{
+					$(this).show();
+					$("#"+id+"_clone").hide();
+				}
+				$("#"+id+"_clone").bind("focus",function(){
+					$(this).hide();
+					$("#"+id).show().removeClass(me.hitcss);
+					$("#"+id).focus();
+				});
+			}
+			if($(this).val() == ""){
+				$(this).removeClass(me.hitcss).addClass(me.hitcss);
+				$(this).val(x_hit);
+			}
+			$(inputobj).bind('blur',function(){
+				var resrec = {res:false,msg:"",callback:null};
+				if(typeof funcname != "undefined"){
+					eval(funcname+".call(this,resrec)");//换了function的this的对象
+					var msgid = $(this).attr('x_msgid');
+					if(typeof msgid == "undefined"){
+						msgid = $(this).attr("id")+"_msg";
+					}
+					if(ispassword){
+						if($("#"+msgid).length == 0){
+							$("#"+id+"_clone").after($("<span id='"+msgid+"'></span>"));
+						}
+					}else{
+						if($("#"+msgid).length == 0){
+							$(this).after($("<span id='"+msgid+"'></span>"));
+						}
+					}
+					if(resrec.res!=0){//验证失败
+						//console.log(resrec)
+						//console.log($('.kdswaiy').html())
+						//console.log($('.kdswaiy').eq(0).text())
+						if(resrec.ishtml){
+							$("#"+msgid).html(resrec.msg);
+						}else{
+							$("#"+msgid).removeClass().addClass(me.errorcss);
+							$("#"+msgid).text(resrec.msg);
+						}
+					}else{
+						if(!me.showokmsg){
+							resrec.msg = "";
+						}
+						if(resrec.ishtml){
+							$("#"+msgid).html(resrec.msg);
+						}else{
+							$("#"+msgid).removeClass().addClass(me.okcss);
+							$("#"+msgid).text(resrec.msg);
+						}
+					}
+					$(this).attr('x_status',resrec.res);
+				}
+				if(ispassword){
+					if($(this).val() == ""){
+						$("#"+$(this).attr("id")+"_clone").removeClass(me.hitcss).addClass(me.hitcss);
+						$("#"+$(this).attr("id")+"_clone").show();
+						$(this).hide();
+					}
+				}else{
+					if($(this).val() == ""){
+						$(this).removeClass(me.hitcss).addClass(me.hitcss);
+						$(this).val(x_hit);
+					}
+				}
+				if(resrec.callback && me.ifdocall){
+					resrec.callback();
+				}
+				me.blurcallback && me.blurcallback($(this));
+			}).bind('focus',function(){
+				//console.log($(this).val())
+				//console.log(x_hit)
+				if($(this).val() == x_hit){
+					$(this).removeClass(me.hitcss);
+					$(this).val("");
+				}
+				me.focuscallback && me.focuscallback($(this));
+			});
+		});
+	};
+	//get data of current form
+	xForm.prototype.getdata = function(){
+		var formObj = $("#"+this.domid + " :input");
+		var data = {};
+		$.each(formObj,function(i,obj){
+			if($.trim($(obj).val()) == $(obj).attr('x_hit')){
+				data[$(obj).attr('name')] = "";
+			}else{
+				if($(obj).is(':checkbox')){
+					if(typeof data[$(obj).attr('name')] == "undefined"){
+						data[$(obj).attr('name')] = new Array();
+					}
+					if($(obj).is(':checked')){
+						data[$(obj).attr('name')].push($.trim($(obj).val()));
+					}
+				}else{
+					data[$(obj).attr('name')] = $.trim($(obj).val());
+				}
+			}
+		});
+		return data;
+	}
+	// check form and return bool true if checked ok else bool false 
+	xForm.prototype.check = function(param){
+		var funcname,status;
+		this.ifdocall = false;
+		if(typeof param == "undefined"){
+			var inputobjs = $("#"+this.domid + " :input");
+		}else{
+			if(param.not){
+				var inputobjs = $("#"+this.domid + " input").not(param.not);
+				inputobjs.removeAttr("x_status");
+			}else if(param.yes){
+				var inputobjs = $("#"+this.domid + " input").not(param.not);
+				inputobjs.removeAttr("x_status");
+				inputobjs = $("#"+this.domid + " input").find(param.yes);
+			}
+		}
+		inputobjs.blur();
+		for(var i=0,length=inputobjs.length;i<length;i++){
+			status = $(inputobjs[i]).attr('x_status');
+			if(status!=undefined && status != 0){
+				this.ifdocall = true;
+				return false;
+			}
+		}
+		this.ifdocall = true;
+		return true;
+	}
+	// set when obj checked if me should handle callback function
+	xForm.prototype.ifDoCallback = function(ifdocall){
+		this.docall = ifdocall;
+	}
+	//render ok html
+	xForm.prototype.okhtml = function($container,msg){
+		$container.removeClass().addClass(this.okcss);
+		$container.html(msg);
+	}
+	//render error html
+	xForm.prototype.errorhtml = function($container,msg){
+		$container.removeClass().addClass(this.errorcss);
+		$container.html(msg);
+	}
+	xForm.prototype.xCheck = function(obj,funcname){
+		var val = $(obj).val();
+		console.log(obj)
+		if(isNaN){
+			return eval('xForm.'+funcname+'("'+$(obj).val()+'")');
+		}else{
+			return eval('xForm.'+funcname+'('+$(obj).val()+')');
+		}
+	}
+	//校验是否全由数字组成 
+	xForm.isDigit = function(s){ 
+		var patrn=/^[0-9]{1,20}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+	//校验登录名：只能输入5-20个以字母开头、可带数字、“_”、“.”的字串 
+	xForm.isRegisterUserName = function(s){ 
+		var patrn=/^[a-zA-Z]{1}([a-zA-Z0-9]|[._]){4,19}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	//校验用户姓名：只能输入1-30个以字母开头的字串 
+	xForm.isTrueName = function(s){ 
+		var patrn=/^[a-zA-Z]{1,30}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	//校验密码：只能输入6-20个字母、数字、下划线 
+	xForm.isPasswd = function(s){ 
+		var patrn=/^(\w){6,20}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	//校验普通电话、传真号码：可以“+”开头，除数字外，可含有“-” 
+	xForm.isTel = function(s){
+		var patrn=/^1[3-8]{1}\d{9}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	//校验手机号码：必须以数字开头，除数字外，可含有“-” 
+	xForm.isMobil = function(s){ 
+		var patrn=/^[+]{0,1}(\d){1,3}[ ]?([-]?((\d)|[ ]){1,12})+$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	//校验邮政编码
+	xForm.isPostalCode = function(s){ 
+		var patrn=/^[a-zA-Z0-9 ]{3,12}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+
+	xForm.isIP = function(s){ 
+		var patrn=/^[0-9.]{1,20}$/; 
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+	xForm.isDomain = function(s){
+		var patrn= /^[A-Za-z]{5,12}$/;
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+	xForm.isRealname = function(s){
+		var patrn = /^[\u4E00-\u9FA5\uF900-\uFA2D]+$/;
+		if (!patrn.exec(s)) return false 
+		return true 
+	}
+	xForm.hit = function($dom){
+		var oldstyle = ($dom.attr('style') || "");
+		var sobj = xForm.Utils.strToObj(oldstyle);
+		if(typeof sobj.color == "undefined"){
+			oldstyle += "color:#000;";
+		}
+		sobj.color = '#999';
+		var newstyle = xForm.Utils.objToStr(sobj);
+		var x_hit = $dom.attr('x_hit');
+		$dom.bind('blur',function(){
+			$dom.val($.trim($dom.val()));
+			if($dom.val() == "" || $dom.val() == x_hit){
+				$dom.attr({'style':newstyle});
+				$dom.val(x_hit);
+			}else{
+				$dom.attr({'style':oldstyle});
+			}
+		}).bind('focus',function(){
+			$dom.val($.trim($dom.val()));
+			if($dom.val()==x_hit){
+				$dom.attr({'style':oldstyle});
+				$dom.val("");
+			}
+		});
+		$dom.blur();
+	}
+	xForm.Utils = {};
+	xForm.Utils.strToObj = function(stylestr){
+		var obj = {};
+		if(typeof stylestr == "undefined"){
+			return obj;
+		}
+		for(var i = 0,styles=stylestr.split(';'),length=styles.length;i<length;i++){
+			var styleobj = styles[i].split(':');
+			if(styleobj.length == 2){
+				obj[styleobj[0]] = styleobj[1];
+			}
+		}
+		return obj;
+	}
+	xForm.Utils.objToStr = function(obj){
+		var retstr = new Array();
+		if(!obj){
+			return retstr;
+		}
+		for(var key in obj){
+			retstr.push(key+":"+obj[key]);
+		}
+		return retstr.join(';');
+	}
+
+	return xForm;
+})();
